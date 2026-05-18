@@ -1,0 +1,16 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Configure BIND9 Statistics",
+        "description": "Enter the host and port for your BIND9 JSON stats endpoint.",
+        "data": {
+          "host": "Host URL (IP:Port or Domain:Port)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect to BIND9 server. Please verify the host and port."
+    }
+  }
+}
