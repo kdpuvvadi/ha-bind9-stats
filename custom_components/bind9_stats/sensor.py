@@ -4,12 +4,12 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from . import DOMAIN
 
 
-async def async_setup_platform(hass, config, async_add_entities, discovery_info=None):
-    """Set up the BIND9 sensors linked to the coordinator."""
-    coordinator = hass.data[DOMAIN]
+async def async_setup_entry(hass, entry, async_add_entities):
+    """Set up the BIND9 sensors linked to a config entry."""
+    coordinator = hass.data[DOMAIN][entry.entry_id]
 
-    # Definitions mapping target JSON path to entity configurations
     sensor_types = [
+        # System Meta
         {
             "name": "BIND9 Version",
             "keys": ["version"],
@@ -17,6 +17,7 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
             "state_class": None,
             "unit": None,
         },
+        # Opcodes (Traffic counters)
         {
             "name": "BIND9 Total Queries",
             "keys": ["opcodes", "QUERY"],
@@ -24,6 +25,7 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
             "state_class": SensorStateClass.TOTAL_INCREASING,
             "unit": "queries",
         },
+        # Rcodes (Response Statuses)
         {
             "name": "BIND9 Success Responses",
             "keys": ["rcodes", "NOERROR"],
@@ -45,6 +47,29 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
             "state_class": SensorStateClass.TOTAL_INCREASING,
             "unit": "responses",
         },
+        # Query Breakdown Types
+        {
+            "name": "BIND9 Query Type A",
+            "keys": ["qtypes", "A"],
+            "icon": "mdi:alpha-a-box-outline",
+            "state_class": SensorStateClass.TOTAL_INCREASING,
+            "unit": "queries",
+        },
+        {
+            "name": "BIND9 Query Type AAAA",
+            "keys": ["qtypes", "AAAA"],
+            "icon": "mdi:alpha-a-box",
+            "state_class": SensorStateClass.TOTAL_INCREASING,
+            "unit": "queries",
+        },
+        {
+            "name": "BIND9 Query Type PTR",
+            "keys": ["qtypes", "PTR"],
+            "icon": "mdi:map-marker-path",
+            "state_class": SensorStateClass.TOTAL_INCREASING,
+            "unit": "queries",
+        },
+        # Resolver Cache Metrics
         {
             "name": "BIND9 Cache Hits",
             "keys": ["views", "_default", "resolver", "cachestats", "CacheHits"],
@@ -61,21 +86,22 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
         },
     ]
 
-    entities = [BIND9Sensor(coordinator, s) for s in sensor_types]
+    entities = [BIND9Sensor(coordinator, entry, s) for s in sensor_types]
     async_add_entities(entities)
 
 
 class BIND9Sensor(CoordinatorEntity, SensorEntity):
     """Representation of individual BIND9 metrics."""
 
-    def __init__(self, coordinator, sensor_def):
+    def __init__(self, coordinator, entry, sensor_def):
         super().__init__(coordinator)
         self._name = sensor_def["name"]
         self._keys = sensor_def["keys"]
         self._attr_icon = sensor_def["icon"]
         self._attr_state_class = sensor_def["state_class"]
         self._attr_native_unit_of_measurement = sensor_def["unit"]
-        self._attr_unique_id = f"bind9_{'_'.join(self._keys).lower()}"
+        # Unique ID generated from Entry ID to safely isolate multiple integration instances
+        self._attr_unique_id = f"{entry.entry_id}_{'_'.join(self._keys).lower()}"
 
     @property
     def name(self):
@@ -83,7 +109,7 @@ class BIND9Sensor(CoordinatorEntity, SensorEntity):
 
     @property
     def native_value(self):
-        """Navigate through nested keys securely."""
+        """Navigate securely through the dynamic multi-layered dictionary object."""
         val = self.coordinator.data
         if not val:
             return None
