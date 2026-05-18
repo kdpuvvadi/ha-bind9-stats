@@ -1,11 +1,12 @@
 from homeassistant.components.sensor import SensorEntity, SensorStateClass
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.helpers.device_registry import DeviceInfo
 from . import DOMAIN
 
 async def async_setup_entry(hass, entry, async_add_entities):
     """Set up the BIND9 sensors linked to a config entry."""
     coordinator = hass.data[DOMAIN][entry.entry_id]
-
+    
     sensor_types = [
         {"name": "BIND9 Version", "keys": ["version"], "icon": "mdi:dns", "state_class": None, "unit": None},
         {"name": "BIND9 Total Queries", "keys": ["opcodes", "QUERY"], "icon": "mdi:comment-question-outline", "state_class": SensorStateClass.TOTAL_INCREASING, "unit": "queries"},
@@ -18,7 +19,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
         {"name": "BIND9 Cache Hits", "keys": ["views", "_default", "resolver", "cachestats", "CacheHits"], "icon": "mdi:cached", "state_class": SensorStateClass.TOTAL_INCREASING, "unit": "hits"},
         {"name": "BIND9 Cache Misses", "keys": ["views", "_default", "resolver", "cachestats", "CacheMisses"], "icon": "mdi:cached", "state_class": SensorStateClass.TOTAL_INCREASING, "unit": "misses"},
     ]
-
+    
     entities = [BIND9Sensor(coordinator, entry, s) for s in sensor_types]
     async_add_entities(entities)
 
@@ -27,6 +28,7 @@ class BIND9Sensor(CoordinatorEntity, SensorEntity):
 
     def __init__(self, coordinator, entry, sensor_def):
         super().__init__(coordinator)
+        self._entry = entry
         self._name = sensor_def["name"]
         self._keys = sensor_def["keys"]
         self._attr_icon = sensor_def["icon"]
@@ -49,3 +51,15 @@ class BIND9Sensor(CoordinatorEntity, SensorEntity):
             else:
                 return None
         return val
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Link this entity to a central BIND9 Device entry."""
+        return DeviceInfo(
+            identifiers={(DOMAIN, self._entry.entry_id)},
+            name=f"BIND9 Server ({self._entry.data['host']})",
+            manufacturer="ISC",
+            model="BIND9 DNS Server",
+            # Dynamically grab the version string from the data payload if available
+            sw_version=self.coordinator.data.get("version") if self.coordinator.data else None,
+        )
